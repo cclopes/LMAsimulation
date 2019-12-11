@@ -4,7 +4,7 @@
 # The black_box function is the main driver function
 # 
 # Contact:
-# vanna.chmielewski@ttu.edu
+# vanna.chmielewski@noaa.gov
 #
 #
 # This model and its results have been submitted to the Journal of Geophysical Research.
@@ -143,7 +143,7 @@ def gen_retrieval(t_all, t_mins, dxvec, drsq, center_ECEF, stations_ECEF,
         least-squares solutions.
     """    
     for i in range(t_all.shape[1]):
-        selection=~np.ma.getmask(t_all[:,i])
+        selection=~np.ma.getmaskarray(t_all[:,i])
         if np.all(selection == True):
             selection = np.array([True]*len(t_all[:,i]))
             yield gen_retrieval_math(i, selection, t_all, t_mins, dxvec, drsq,
@@ -172,7 +172,7 @@ def gen_retrieval_full(t_all, t_mins, dxvec, drsq, center_ECEF, stations_ECEF,
         station
     """    
     for i in range(t_all.shape[1]):
-        selection=~np.ma.getmask(t_all[:,i])
+        selection=~np.ma.getmaskarray(t_all[:,i])
         plsq = np.array([np.nan]*7)
         if np.all(selection == True):
             selection = np.array([True]*len(t_all[:,i]))
@@ -193,6 +193,17 @@ def gen_retrieval_full(t_all, t_mins, dxvec, drsq, center_ECEF, stations_ECEF,
             plsq[6] = np.shape(stations_ECEF[selection])[0]
             yield plsq
 
+
+def array_from_generator2(generator, rows):
+    """Creates a numpy array from a specified number 
+    of values from the generator provided."""
+    data = []
+    for row in range(rows):
+        try:
+            data.append(next(generator))
+        except StopIteration:
+            break
+    return np.array(data)
 
 def black_box(x,y,z,n,
               stations_local,ordered_threshs,stations_ecef,center_ecef,
@@ -280,9 +291,11 @@ def black_box(x,y,z,n,
                               center_ecef, stations_ecef, dt_rms, 
                               min_stations)
     # Suck up the values produced by the generator, produce named array.
-    retrieved_locations = np.fromiter(point_gen, dtype=dtype)
-    retrieved_locations = np.array([(a,b,c,e) for (a,b,c,d,e) in 
-                                     retrieved_locations])
+    # retrieved_locations = np.fromiter(point_gen, dtype=dtype)
+    # retrieved_locations = np.array([(a,b,c,e) for (a,b,c,d,e) in 
+    #                                  retrieved_locations])
+    retrieved_locations = array_from_generator2(point_gen,rows=n)
+    retrieved_locations = retrieved_locations[:,[0,1,2,-1]]
     chi2                = retrieved_locations[:,3]
     retrieved_locations = retrieved_locations[:,:3]
     retrieved_locations = np.ma.masked_invalid(retrieved_locations)
@@ -315,7 +328,7 @@ def black_box(x,y,z,n,
         return np.mean(difs.T[chi2[good]<chi2_filter].T, axis=1
              ), np.std(difs.T[chi2[good]<chi2_filter].T, axis=1
              ), np.ma.count_masked(difs[0])+np.sum(chi2[good]>=chi2_filter
-             )+np.sum(-good)
+             )+np.sum(~good)
     else:
         #Convert back to local tangent plane
         soluts = tanp.toLocal(retrieved_locations.T)
@@ -398,9 +411,11 @@ def black_box_full(x,y,z,n,
                                    center_ecef, stations_ecef, dt_rms, 
                                    min_stations) 
     # Suck up all the values produced by the generator, produce named array.
-    retrieved_locations = np.fromiter(point_gen, dtype=dtype)
-    retrieved_locations = np.array([(a,b,c,e,f,g) for (a,b,c,d,e,f,g) in 
-                                   retrieved_locations])
+    # retrieved_locations = np.fromiter(point_gen, dtype=dtype)
+    # retrieved_locations = np.array([(a,b,c,e,f,g) for (a,b,c,d,e,f,g) in 
+    #                                retrieved_locations])
+    retrieved_locations = array_from_generator2(point_gen,rows=n)
+    retrieved_locations = retrieved_locations[:,[0,1,2,4,5,6]]
     station_count       = retrieved_locations[:,5]
     terror              = retrieved_locations[:,4]
     chi2                = retrieved_locations[:,3]
@@ -409,7 +424,7 @@ def black_box_full(x,y,z,n,
     # Converts to projection
     soluts = tanp.toLocal(retrieved_locations.T)
     good   = soluts[2] > 0
-    station_count[-good] = np.nan
+    station_count[~good] = np.nan
     # proj_points = projl.fromECEF(points_f_ecef[good,0], 
     #                              points_f_ecef[good,1], 
     #                              points_f_ecef[good,2])
@@ -450,11 +465,11 @@ def curvature_matrix(points,stations_local,ordered_threshs,c0,power,
     test_power = received_power(power,dist)
     masking = 10.*np.log10(test_power/1e-3) < ordered_threshs
     # Precalculate some terms to simplify the calculations for each term
-    ut1 = -dist[-masking]
-    ut2 = stations_local[-masking] - points
-    dist_term = dist[-masking]*dist[-masking]
+    ut1 = -dist[~masking]
+    ut2 = stations_local[~masking] - points
+    dist_term = dist[~masking]*dist[~masking]
     # Find each term of the curvature matrix
-    if np.sum(-masking)>=min_stations:
+    if np.sum(~masking)>=min_stations:
         curvature_matrix = np.empty((4,4))
         curvature_matrix[0,0] = np.sum((ut2[:,1]**2 + ut2[:,2]**2)*
                                         dist_term**(-3./2.)*ut1+1)
@@ -462,7 +477,7 @@ def curvature_matrix(points,stations_local,ordered_threshs,c0,power,
                                         dist_term**(-3./2.)*ut1+1)
         curvature_matrix[2,2] = np.sum((ut2[:,1]**2 + ut2[:,0]**2)*
                                         dist_term**(-3./2.)*ut1+1)
-        curvature_matrix[3,3] = np.sum(-masking)
+        curvature_matrix[3,3] = np.sum(~masking)
         curvature_matrix[0,1] = np.sum(-ut1*ut2[:,0]*ut2[:,1]*
                                        dist_term**(-3./2.))
         curvature_matrix[0,2] = np.sum(-ut1*ut2[:,0]*ut2[:,2]*
