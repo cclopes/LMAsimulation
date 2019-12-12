@@ -307,9 +307,10 @@ def black_box(x,y,z,n,
                                      retrieved_locations[:,1], 
                                      retrieved_locations[:,2])
         good = proj_soluts[2] > 0
-        proj_soluts = (proj_soluts[0][good],proj_soluts[1][good],
+        proj_soluts = (proj_soluts[0][good],
+                       proj_soluts[1][good],
                        proj_soluts[2][good])
-        proj_points = projl.fromECEF(points_f_ecef[good,0], 
+        proj_points = projl.fromECEF(points_f_ecef[good,0],
                                      points_f_ecef[good,1], 
                                      points_f_ecef[good,2])
 

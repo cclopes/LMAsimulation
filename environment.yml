@@ -1,0 +1,17 @@
+name: lmasimulation
+dependencies:
+  - python=3.*
+  - jupyter
+  - scipy
+  - pandas
+  - proj4
+  - matplotlib
+  - basemap
+  - cartopy
+
+# Problem with PROJ_LIB in Basemap:
+# Go to
+# /.../lib/python3.7/site-packages/mpl_toolkits/basemap/__init__.py
+# Add this line
+# os.environ['PROJ_LIB'] = '/home/camila/miniconda3/envs/lmasimulation/share/proj'
+# And add the file 'epsg' in the above folder
